@@ -49,12 +49,14 @@ tag value = yes or no (yes: The code assign tags to ions with zero tags; no: The
 
 Examples
 
+fix 1 all charge_regulation 3 3 3 3 2.7 1 2 3 4 
+
 fix chareg all charge_regulation 7 3 3 4 4 1 3 2 4 lb 0.7 temp 1.0 nevery 200 nexchange 200 seed 2345 rxd 2 tempfixid fT
 
 Description
 
-This fix performs grand canonical Monte Carlo moves of acid and base reactions as well as the exchange of ion pairs with a reservoir.…(Add more details)….
+This fix performs grand canonical Monte Carlo moves of acid and base reactions as well as the exchange of ion pairs with a reservoir…(Add more details)….
 
 Default:
 
-tag = no; nevery = 100; nexchanges = 100; lb = 0.72; reservoir_temperature = 1.0; reaction_distance = 0; seed = 12345; target_temperature_tcp = 1.0
+lb = 0.72; temp = 1.0; nevery = 100; nexchange = 100; xrd = 0; seed = 2345; tag = no

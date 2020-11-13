@@ -1,2 +1,2 @@
 # charge-regulation
-fix_charge_regulation for LAMMPS
+fix_charge_regulation for LAMMPS, development in progress...

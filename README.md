@@ -51,7 +51,7 @@ Examples
 
 fix 1 all charge_regulation 3 3 3 3 2.7 1 2 3 4 
 
-fix chareg all charge_regulation 7 3 3 4 4 1 3 2 4 lb 0.7 temp 1.0 nevery 200 nexchange 200 seed 2345 rxd 2 tempfixid fT
+fix chareg all charge_regulation 7 3 3 4 4 1 3 2 4 lb 0.7 temp 1.0 nevery 200 nexchange 200 seed 123 rxd 2 tempfixid fT
 
 Description
 

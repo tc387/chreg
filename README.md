@@ -27,7 +27,7 @@ cation_type = atom type of free cations
 
 anion_type = atom type of free anions
 
-zero or more keyword/value pairs may be appended to args
+zero or more keyword/value pairs may be appended
 
 keyword = lb, temp, tempfixid, nevery, nexchange, xrd, seed, tag
 

@@ -576,8 +576,8 @@ void Fix_charge_regulation::backward_ions() {
                 mask2_tmp = atom->mask[m2];
                 atom->mask[m2] = exclusion_group_bit;
             }
-            factor = ncation * nanion / (volume_rx * volume_rx * (pow(10, -pH) + pow(10, -pI_plus)) *
-                      (pow(10, -pKs + pH) + pow(10, -pI_minus)));
+            factor = (volume_rx * volume_rx * (pow(10, -pH) + pow(10, -pI_plus)) *
+                     (pow(10, -pKs + pH) + pow(10, -pI_minus))) / (ncation * nanion);
 
             double energy_after = energy_full();
             if (energy_after < MAXENERGYTEST &&

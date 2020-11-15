@@ -39,29 +39,24 @@ namespace LAMMPS_NS {
         void backward_ions();
         int get_random_particle(int, double, double, double *);
         int insert_particle(int, double, double, double *);
-        int particle_number_A();
-        int particle_number_A_minus();
-        int particle_number_B();
-        int particle_number_B_plus();
-        int particle_number_S_plus();
-        int particle_number_S_minus();
         double energy_full();
+        int particle_number(int, double);
+        int particle_number_xrd(int, double, double, double *);
         double compute_vector(int n);
         void assign_tags();
         void options(int, char **);
         void setThermoTemperaturePointer();
+        double memory_usage();
 
     private:
-        int molecule_group, molecule_group_bit;
-        int molecule_group_inversebit;
         int exclusion_group, exclusion_group_bit;
         int ngcmc_type, nevery, seed;
         int ncycles, nexchanges, nmcmoves;
         double patomtrans, pmoltrans, pmolrotate, pmctot;
         double lb, pH, pKa, pKb, pKs, pI_plus, pI_minus;
-        int ngas;                 // # of gas atoms on all procs
-        int ngas_local;           // # of gas atoms on this proc
-        int ngas_before;          // # of gas atoms on procs < this proc
+        int npart_xrd;            // # of particles (ions) within xrd
+        int npart_xrd2;            // # of particles (ions) within xrd
+        double vlocal_xrd;            // # local volume within xrd
         int exchmode;             // exchange ATOM or MOLECULE
         int movemode;             // move ATOM or MOLECULE
         int regionflag;           // 0 = anywhere in box, 1 = specific region
@@ -84,19 +79,19 @@ namespace LAMMPS_NS {
         int *grouptypes;          // list of type-based group types
 
         double nacid_attempts, nacid_successes, nbase_attempts, nbase_successes, nsalt_attempts, nsalt_successes;
+        int nacid_neutral, nacid_charged, nbase_neutral, nbase_charged, ncation, nanion;
 
-        int gcmc_nmax;
+        int cr_nmax;  // current max number of rx particles (acid/base,ions)
         int max_region_attempts;
         double gas_mass;
         double reservoir_temperature;
-        double beta, sigma, volume;
+        double beta, sigma, volume, volume_rx;
         double charge;
         double xlo, xhi, ylo, yhi, zlo, zhi;
         double region_xlo, region_xhi, region_ylo, region_yhi, region_zlo, region_zhi;
         double region_volume;
         double energy_stored;  // full energy of old/current configuration
         double *sublo, *subhi;
-        int *local_gas_list;
         double **cutsq;
         int *ptype_ID;
         double overlap_cutoffsq; // square distance cutoff for overlap
@@ -105,6 +100,8 @@ namespace LAMMPS_NS {
         int min_ngas;
         int acid_type, cation_type, base_type, anion_type, reaction_distance_flag;
         double reaction_distance;
+
+
 
         double energy_intra;
 

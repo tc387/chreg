@@ -16,11 +16,11 @@ variable cut_long equal 16.0
 variable ljeps equal 1.0
 variable nevery equal 1
 variable nmcswapmoves equal 100
-variable pH  equal 4.0
+variable pH  equal 5.0
 variable pKa equal 5.0
 variable pKb equal 5.0
-variable pIp equal 4.0
-variable pIm equal 4.0
+variable pIp equal 5.0
+variable pIm equal 5.0
 dielectric 1.0
 
 variable 	cut_lj equal 2^(1.0/6.0)

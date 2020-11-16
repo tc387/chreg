@@ -1068,7 +1068,7 @@ int Fix_charge_regulation::particle_number_xrd(int ptype, double charge, double 
     int count = 0;
     if (rd < small) {
         for (int i = 0; i < atom->nlocal; i++) {
-            if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < small)
+            if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < small &&  atom->mask[i] != exclusion_group_bit)
                 count++;
         }
     } else {
@@ -1082,7 +1082,7 @@ int Fix_charge_regulation::particle_number_xrd(int ptype, double charge, double 
             dz -= static_cast<int>(1.0 * dz / (zhi - zlo) + 0.5) * (zhi - zlo);
             distance_check = dx * dx + dy * dy + dz * dz;
             if ((distance_check < rd * rd) && atom->type[i] == ptype &&
-                fabs(atom->q[i] - charge) < small) {
+                fabs(atom->q[i] - charge) < small &&  atom->mask[i] != exclusion_group_bit) {
                 count++;
             }
         }
@@ -1096,7 +1096,7 @@ int Fix_charge_regulation::particle_number(int ptype, double charge) {
 
     int count = 0;
     for (int i = 0; i < atom->nlocal; i++) {
-        if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < small)
+        if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < small &&  atom->mask[i] != exclusion_group_bit)
             count = count + 1;
     }
     int count_sum = count;

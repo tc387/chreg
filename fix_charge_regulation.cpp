@@ -78,42 +78,28 @@ Fix_charge_regulation::Fix_charge_regulation(LAMMPS *lmp, int narg, char **arg) 
     overlap_flag = 0;
     energy_stored = 0;
 
-    pH = force->numeric(FLERR, arg[3]);
-    pKa = force->numeric(FLERR, arg[4]);
-    pKb = force->numeric(FLERR, arg[5]);
 
-    pI_plus = force->numeric(FLERR, arg[6]);
-    pI_minus = force->numeric(FLERR, arg[7]);
-
-    acid_type = force->inumeric(FLERR, arg[8]);
-    base_type = force->inumeric(FLERR, arg[9]);
-    cation_type = force->inumeric(FLERR, arg[10]);
-    anion_type = force->inumeric(FLERR, arg[11]);
+    // necessary to specify the free ion type
+    cation_type = force->numeric(FLERR, arg[3]);
+    anion_type = force->numeric(FLERR, arg[4]);
 
     // read optional arguments
-    options(narg - 12, &arg[12]);
+    options(narg - 5, &arg[5]);
 
     if (nevery <= 0) error->all(FLERR, "Illegal fix charge_regulation command");
     if (nexchanges < 0) error->all(FLERR, "Illegal fix charge_regulation command");
     if (lb < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
-    if (pH < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
-    if (pKs < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
-    if (pKa < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
-    if (pKb < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
-    if (pI_plus < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
-    if (pI_minus < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
+
     if (*target_temperature_tcp < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
     if (seed <= 0) error->all(FLERR, "Illegal fix charge_regulation command");
-    if (acid_type < 0) error->all(FLERR, "Illegal fix charge_regulation command");
-    if (cation_type < 0) error->all(FLERR, "Illegal fix charge_regulation command");
-    if (base_type < 0) error->all(FLERR, "Illegal fix charge_regulation command");
-    if (anion_type < 0) error->all(FLERR, "Illegal fix charge_regulation command");
+    if (cation_type <= 0) error->all(FLERR, "Illegal fix charge_regulation command");
+    if (anion_type <= 0) error->all(FLERR, "Illegal fix charge_regulation command");
     if (reaction_distance < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
     if (salt_charge[0] <= 0) error->all(FLERR, "Illegal fix charge_regulation command");
     if (salt_charge[1] >= 0) error->all(FLERR, "Illegal fix charge_regulation command");
     if ((salt_charge[1] % salt_charge[0] != 0) && (salt_charge[0] % salt_charge[1] != 0))
         error->all(FLERR,
-                   "Illegal fix charge_regulation command, multivalent cation/anion charges are allowed, but must be divisible, e.g. (3,-2) is not implemented");
+                   "Illegal fix charge_regulation command, multivalent cation/anion charges are allowed, but must be divisible, e.g. (3,-1) is fine, but (3,-2) is not implemented");
 
 
     force_reneighbor = 1;
@@ -295,7 +281,7 @@ void Fix_charge_regulation::pre_exchange() {
     if (!only_salt_flag) {
 
         // Do charge regulation
-        for (int i = 0; i < nexchanges; i++) {
+        for (int i = 0; i < 6 * nexchanges; i++) {
             double rand_number = random_equal->uniform();
             if (rand_number < 1.0 / 6) {
                 forward_acid();
@@ -324,7 +310,7 @@ void Fix_charge_regulation::pre_exchange() {
         } else {
             salt_charge_ratio = -salt_charge[1] / salt_charge[0];
         }
-        for (int i = 0; i < nexchanges; i++) {
+        for (int i = 0; i < 2 * nexchanges; i++) {
             double rand_number = random_equal->uniform();
             if (rand_number < 0.5) {
                 forward_ions_multival();
@@ -1185,15 +1171,24 @@ void Fix_charge_regulation::options(int narg, char **arg) {
     if (narg < 0) error->all(FLERR, "Illegal fix charge regulation command");
 
     // defaults
-    add_tags_flag = false;
+
+    pH=7.0;
+    pI_plus=100;
+    pI_minus=100;
+    acid_type = -1;
+    base_type = -1;
+    pKa=100;
+    pKb=100;
+    pKs = 14.0;
     nevery = 100;
     nexchanges = 100;
     lb = 0.72;
-    pKs = 14.0;
+
     reservoir_temperature = 1.0;
     reaction_distance = 0;
     seed = 12345;
     target_temperature_tcp = &reservoir_temperature;
+    add_tags_flag = false;
     only_salt_flag = false;
     salt_charge[0] = 1; // cation charge
     salt_charge[1] = -1; // anion charge
@@ -1216,6 +1211,35 @@ void Fix_charge_regulation::options(int narg, char **arg) {
             if (iarg + 2 > narg) error->all(FLERR, "Illegal fix charge regulation command");
             lb = force->numeric(FLERR, arg[iarg + 1]);
             iarg += 2;
+        } else if (strcmp(arg[iarg], "acid_type") == 0) {
+            if (iarg + 2 > narg) error->all(FLERR, "Illegal fix charge regulation command");
+            acid_type = force->numeric(FLERR, arg[iarg + 1]);
+            iarg += 2;
+        } else if (strcmp(arg[iarg], "base_type") == 0) {
+            if (iarg + 2 > narg) error->all(FLERR, "Illegal fix charge regulation command");
+            base_type = force->numeric(FLERR, arg[iarg + 1]);
+            iarg += 2;
+        } else if (strcmp(arg[iarg], "pH") == 0) {
+            if (iarg + 2 > narg) error->all(FLERR, "Illegal fix charge regulation command");
+            pH = force->numeric(FLERR, arg[iarg + 1]);
+            iarg += 2;
+        } else if (strcmp(arg[iarg], "pIp") == 0) {
+            if (iarg + 2 > narg) error->all(FLERR, "Illegal fix charge regulation command");
+            pI_plus = force->numeric(FLERR, arg[iarg + 1]);
+            iarg += 2;
+        } else if (strcmp(arg[iarg], "pIm") == 0) {
+            if (iarg + 2 > narg) error->all(FLERR, "Illegal fix charge regulation command");
+            pI_minus = force->numeric(FLERR, arg[iarg + 1]);
+            iarg += 2;
+        } else if (strcmp(arg[iarg], "pKa") == 0) {
+            if (iarg + 2 > narg) error->all(FLERR, "Illegal fix charge regulation command");
+            pKa = force->numeric(FLERR, arg[iarg + 1]);
+            iarg += 2;
+        } else if (strcmp(arg[iarg], "pKb") == 0) {
+            if (iarg + 2 > narg) error->all(FLERR, "Illegal fix charge regulation command");
+            pKb = force->numeric(FLERR, arg[iarg + 1]);
+            iarg += 2;
+
         } else if (strcmp(arg[iarg], "temp") == 0) {
             if (iarg + 2 > narg) error->all(FLERR, "Illegal fix charge regulation command");
             reservoir_temperature = force->numeric(FLERR, arg[iarg + 1]);

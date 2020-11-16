@@ -27,9 +27,10 @@ cation_type = atom type of free cations
 
 anion_type = atom type of free anions
 
+
 zero or more keyword/value pairs may be appended
 
-keyword = lb, temp, tempfixid, nevery, nexchange, xrd, seed, tag
+keyword = lb, temp, tempfixid, nevery, nexchange, xrd, seed, tag, group, onlysalt, 
 
 lb value = Bjerrum length (# in the unit of nm)
 
@@ -45,13 +46,21 @@ xrd value = cutoff distance for acid/base reaction
 
 seed value = random # seed (positive integer)
 
-tag value = yes or no (yes: The code assign tags to ions with zero tags; no: The code does not assign tags to ions with zero tags).
+tag value = yes or no (yes: The code assign unique tags to inserted ions; no: The tag of all inserted ions is "0")
+
+group value = group-ID, inserted ions are assigned to group group-ID. Can be used multiple times to assign inserted ions to multiple groups.
+
+onlysalt values = flag qcation qanion. 
+  flag = yes or no (yes: the fix performs only ion insertion/deletion, no: perform acid/base dissociation and ion insertion/deletion
+  qcation, qanion = value of cation/anion charge, must be an integer (only provide if flag = yes)
 
 Examples
 
-fix 1 all charge_regulation 3 3 3 3 2.7 1 2 3 4 
+fix 1 all charge_regulation 7 3 3 4 4 1 2 3 4 
 
-fix chareg all charge_regulation 7 3 3 4 4 1 3 2 4 lb 0.7 temp 1.0 nevery 200 nexchange 200 seed 123 rxd 2 tempfixid fT
+fix chareg all charge_regulation 7 3 3 4 4 1 3 2 4 lb 1.0 nevery 200 nexchange 200 seed 123 rxd 5 tempfixid flang tag yes 
+
+fix chareg all charge_regulation 0 0 0 4 4 0 0 2 4 tempfixid flang tag yes onlysalt yes 2 -1
 
 Description
 
@@ -59,4 +68,4 @@ This fix performs grand canonical Monte Carlo moves of acid and base reactions a
 
 Default:
 
-lb = 0.72; temp = 1.0; nevery = 100; nexchange = 100; xrd = 0; seed = 2345; tag = no
+lb = 0.72; temp = 1.0; nevery = 100; nexchange = 100; xrd = 0; seed = 2345; tag = no; onlysalt = no;

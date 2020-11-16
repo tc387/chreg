@@ -27,7 +27,7 @@ namespace LAMMPS_NS {
     class Fix_charge_regulation : public Fix {
     public:
         Fix_charge_regulation(class LAMMPS *, int, char **);
-        ~Fix_charge_regulation() {}
+        ~Fix_charge_regulation();
         int setmask();
         void init();
         void pre_exchange();
@@ -36,7 +36,9 @@ namespace LAMMPS_NS {
         void forward_base();
         void backward_base();
         void forward_ions();
+        void forward_ions_multival();
         void backward_ions();
+        void backward_ions_multival();
         int get_random_particle(int, double, double, double *);
         int insert_particle(int, double, double, double *);
         double energy_full();
@@ -52,23 +54,17 @@ namespace LAMMPS_NS {
         int exclusion_group, exclusion_group_bit;
         int ngcmc_type, nevery, seed;
         int ncycles, nexchanges, nmcmoves;
-        double patomtrans, pmoltrans, pmolrotate, pmctot;
         double lb, pH, pKa, pKb, pKs, pI_plus, pI_minus;
         int npart_xrd;            // # of particles (ions) within xrd
         int npart_xrd2;            // # of particles (ions) within xrd
-        double vlocal_xrd;            // # local volume within xrd
+        double vlocal_xrd;         // # local volume within xrd
         int exchmode;             // exchange ATOM or MOLECULE
         int movemode;             // move ATOM or MOLECULE
         int regionflag;           // 0 = anywhere in box, 1 = specific region
         int iregion;              // gcmc region
         char *idregion;           // gcmc region id
-        bool pressure_flag;       // true if user specified reservoir pressure
-        bool charge_flag;         // true if user specified atomic charge
-        bool full_flag;           // true if doing full system energy calculations
-        bool add_tags_flag;        // true if each inserted atom gets its unique atom tag
-
-        int natoms_per_molecule;  // number of atoms in each inserted molecule
-        int nmaxmolatoms;         // number of atoms allocated for molecule arrays
+        bool only_salt_flag;      // true if performing only salt insertion/deletion, no acid/base dissociation.
+        bool add_tags_flag;       // true if each inserted atom gets its unique atom tag
 
         int groupbitall;          // group bitmask for inserted atoms
         int ngroups;              // number of group-ids for inserted atoms
@@ -81,12 +77,13 @@ namespace LAMMPS_NS {
         double nacid_attempts, nacid_successes, nbase_attempts, nbase_successes, nsalt_attempts, nsalt_successes;
         int nacid_neutral, nacid_charged, nbase_neutral, nbase_charged, ncation, nanion;
 
-        int cr_nmax;  // current max number of rx particles (acid/base,ions)
+        int cr_nmax;              //  max number of local particles
         int max_region_attempts;
         double gas_mass;
         double reservoir_temperature;
         double beta, sigma, volume, volume_rx;
-        double charge;
+        int salt_charge[2];    // charge of salt ions: [0] - cation, [1] - anion
+        int salt_charge_ratio ;
         double xlo, xhi, ylo, yhi, zlo, zhi;
         double region_xlo, region_xhi, region_ylo, region_yhi, region_zlo, region_zhi;
         double region_volume;

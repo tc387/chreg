@@ -19,8 +19,8 @@ variable nmcswapmoves equal 100
 variable pH  equal 5.0
 variable pKa equal 5.0
 variable pKb equal 5.0
-variable pIp equal 5.0
-variable pIm equal 5.0
+variable pIp equal 4.5
+variable pIm equal 4.5
 dielectric 1.0
 
 variable 	cut_lj equal 2^(1.0/6.0)
@@ -35,7 +35,8 @@ group		S_plus type 2
 group		B type 3
 group 		S_minus type 4
 group       rigid_atoms type 1 3 
-group       salt type 2 4
+group       salt type 3 4
+
 
 velocity	all create 1.0 8008 loop geom
 
@@ -53,9 +54,10 @@ pair_modify 	shift no
 fix		fnve all nve #  temp 1.0 1.0 1.0 
 fix		flang all langevin 1.0 1.0 1.0 123
 
-fix chareg all charge_regulation  ${pH} ${pKa} ${pKb} 10 10 1 2 3 4 lb 1 nevery 200 nexchange 200  tempfixid flang
-fix chareg2 all charge_regulation  50 100 100 ${pIp} ${pIm} 0 0 5 6 lb 1 pKs 200 nevery 200 nexchange 200 rxd 5 tempfixid flang
-fix chareg3 all charge_regulation  50 100  100 ${pH} ${pIm} 0 0 3 6 lb 1 pKs 200 nevery 200 nexchange 200 rxd 5 tempfixid flang
+fix chareg all charge_regulation  ${pH} ${pKa} ${pKb} 5 5 1 2 3 4 lb 1 nevery 200 nexchange 200  tempfixid flang group salt
+fix chareg2 all charge_regulation  50 100 100 ${pIp} ${pIm} 0 0 7 8 lb 1 pKs 200 nevery 200 nexchange 200 rxd 5 tempfixid flang onlysalt yes 2 -2
+
+fix chareg3 all charge_regulation  50 100  100 ${pIp} ${pIm} 0 0 3 8 lb 1 pKs 200 nevery 200 nexchange 200 rxd 5 tempfixid flang onlysalt yes 1 -2
 
 # optional arguments: lb, temp, tempfixid, nevery, nexchange, xrd, seed, tag
 
@@ -66,5 +68,5 @@ dump		dumpID all custom 200 dump.chreg.lammpstrj id mol type x y z q
 dump_modify	dumpID flush yes
 #fix  favq    all ave/time  2 100 200 f_chareg[3] f_chareg[4] f_chareg[5] f_chareg[6] f_chareg[7] f_chareg[8] file avq.dat # average charge on acids acids
 timestep	0.01
-run		200000
+run		20000
 write_data data.chreg.lammps

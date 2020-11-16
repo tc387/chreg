@@ -1,0 +1,59 @@
+# Charge regulation lammps
+
+units		lj
+atom_style	charge
+dimension	3
+boundary	p p p
+processors 	* * * 
+neighbor	3.0 bin
+neigh_modify	delay 0 every 1 check yes one 10000
+
+read_data	data_salt.chreg
+
+variable radius equal 1.0
+variable cut_long equal 16.0
+variable ljeps equal 1.0
+variable nevery equal 400
+variable nmcswapmoves equal 200
+variable pH equal 3.0
+variable pKa equal 3.0
+variable pKb equal 6.0
+variable pIm equal 2.698970006507491
+variable pIp equal 3
+dielectric 1.0
+
+variable 	cut_lj equal 2^(1.0/6.0)
+variable 	cut_ljh equal 2^(1.0/6.0)/2.0	
+variable	ljepsh equal 1.0
+variable	lb equal 0.7 # in the unit of nm
+variable cut_long equal 18.0
+variable ljeps equal 1.0
+
+group		A type 1
+group		S_plus type 2
+group		B type 3
+group 		S_minus type 4
+
+velocity	all create 1.0 8008 loop geom
+
+#pair_style      hybrid lj/expand ${cut_lj}  lj/cut/coul/long ${cut_lj} ${cut_long}
+pair_style       lj/cut/coul/long ${cut_lj} ${cut_long} 
+
+pair_coeff	* *  1.0 1.0 ${cut_lj} # charges
+
+kspace_style	ewald 1.0e-3
+pair_modify 	shift no
+
+
+#########  VERLET INTEGRATION  ###########
+fix		fnve all nve #  temp 1.0 1.0 1.0 
+fix		fT all langevin 1.0 1.0 1.0 123
+fix chareg all charge_regulation  ${pH} ${pKa} ${pKb} ${pIp} ${pIm} 1 3 2 4 lb ${lb} temp 1.0 nevery ${nevery} nexchange ${nmcswapmoves} seed 2345 rxd 0 tempfixid fT
+thermo		400
+thermo_style	custom step pe ecoul elong ke etotal temp f_chareg[1] f_chareg[2] f_chareg[3] f_chareg[4] f_chareg[5] f_chareg[6] f_chareg[7] f_chareg[8]
+dump		dumpID all custom 200 dump.chreg.lammpstrj id type x y z q
+fix  favq    all ave/time  2 100 200 f_chareg[3] f_chareg[4] f_chareg[5] f_chareg[6] f_chareg[7] f_chareg[8] file avq.dat # average charge on acids acids
+dump_modify dumpID sort id 
+timestep	0.005
+run		2000000
+write_data data.chreg.lammps

@@ -1120,9 +1120,9 @@ double Fix_charge_regulation::compute_vector(int n) {
     } else if (n == 5) {
         return particle_number(base_type, 1);
     } else if (n == 6) {
-        return particle_number(cation_type, 1);
+        return particle_number(cation_type, salt_charge[0]);
     } else if (n == 7) {
-        return particle_number(anion_type, -1);
+        return particle_number(anion_type, salt_charge[1]);
     }
     return 0.0;
 }

@@ -54,14 +54,10 @@ pair_modify 	shift no
 fix		fnve all nve #  temp 1.0 1.0 1.0 
 fix		flang all langevin 1.0 1.0 1.0 123
 
-fix chareg all charge_regulation  ${pH} ${pKa} ${pKb} 5 5 1 2 3 4 lb 1 nevery 200 nexchange 200  tempfixid flang group salt
-fix chareg2 all charge_regulation  50 100 100 ${pIp} ${pIm} 0 0 7 8 lb 1 pKs 200 nevery 200 nexchange 200 rxd 5 tempfixid flang onlysalt yes 2 -2
-
-fix chareg3 all charge_regulation  50 100  100 ${pIp} ${pIm} 0 0 3 8 lb 1 pKs 200 nevery 200 nexchange 200 rxd 5 tempfixid flang onlysalt yes 1 -2
+fix chareg all charge_regulation 3 8 pH ${pH} pKa ${pKa} pKb ${pKb} lb 0.72 nevery 200 nexchange 200
 
 # optional arguments: lb, temp, tempfixid, nevery, nexchange, xrd, seed, tag
 
-# fix ID group-ID charge_regulation pH pKa pKb pI^+ pI^- acid_type base_type cation_type anion_type
 thermo		100
 thermo_style	custom step pe ecoul elong ke etotal temp  f_chareg[3] f_chareg[4] f_chareg[5] f_chareg[6] f_chareg[7] f_chareg[8] #f_chareg2[7] f_chareg2[8]  # f_chareg3[7] f_chareg3[8]
 dump		dumpID all custom 200 dump.chreg.lammpstrj id mol type x y z q

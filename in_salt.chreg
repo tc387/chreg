@@ -1,4 +1,4 @@
-# Charge regulation lammps
+# Charge regulation lammps for simple weak electrolyte
 
 units		lj
 atom_style	charge
@@ -31,8 +31,7 @@ variable ljeps equal 1.0
 
 group		A type 1
 group		S_plus type 2
-group		B type 3
-group 		S_minus type 4
+group 		S_minus type 3
 
 velocity	all create 1.0 8008 loop geom
 
@@ -48,12 +47,12 @@ pair_modify 	shift no
 #########  VERLET INTEGRATION  ###########
 fix		fnve all nve #  temp 1.0 1.0 1.0 
 fix		fT all langevin 1.0 1.0 1.0 123
-fix chareg all charge_regulation 2 4 acid_type 1 base_type 3 pH ${pH} pKa ${pKa} pKb ${pKb} pIp ${pIp} pIm ${pIm} lb ${lb} temp 1.0 nevery ${nevery} nexchange ${nmcswapmoves} seed 2345 rxd 0 tempfixid fT
+fix chareg all charge_regulation 2 3 acid_type 1 pH ${pH} pKa ${pKa} pKb ${pKb} pIp ${pIp} pIm ${pIm} lb ${lb} temp 1.0 nevery ${nevery} nexchange ${nmcswapmoves} seed 2345 rxd 0 tempfixid fT
 thermo		400
 thermo_style	custom step pe ecoul elong ke etotal temp f_chareg[1] f_chareg[2] f_chareg[3] f_chareg[4] f_chareg[5] f_chareg[6] f_chareg[7] f_chareg[8]
 dump		dumpID all custom 200 dump.chreg.lammpstrj id type x y z q
 fix  favq    all ave/time  2 100 200 f_chareg[3] f_chareg[4] f_chareg[5] f_chareg[6] f_chareg[7] f_chareg[8] file avq.dat # average charge on acids acids
 dump_modify dumpID sort id 
 timestep	0.005
-run		2000000
+run		20000
 write_data data.chreg.lammps

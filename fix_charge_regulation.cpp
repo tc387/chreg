@@ -13,7 +13,7 @@
 ------------------------------------------------------------------------- */
 
 /* ----------------------------------------------------------------------
-   Contributing author: Tine Curk (curk@northwestern.edu) and Jiaxing Yuan
+   Contributing author: Tine Curk (curk@northwestern.edu) and Jiaxing Yuan (yuanjiaxing123@hotmail.com)
 ------------------------------------------------------------------------- */
 #include "fix_charge_regulation.h"
 #include <mpi.h>

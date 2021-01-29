@@ -53,8 +53,10 @@ namespace LAMMPS_NS {
     private:
         int exclusion_group, exclusion_group_bit;
         int ngcmc_type, nevery, seed;
-        int ncycles, nexchanges, nmcmoves;
+        int ncycles, nreaact, nmc;
         double lb, pH, pKa, pKb, pKs, pI_plus, pI_minus;
+        double pmcmoves[3];         // mc move attempt probability, acid, base, salt; and comulative
+        double pmcc;                // mc move cumulative attempt probability
         int npart_xrd;            // # of particles (ions) within xrd
         int npart_xrd2;            // # of particles (ions) within xrd
         double vlocal_xrd;         // # local volume within xrd
@@ -97,8 +99,6 @@ namespace LAMMPS_NS {
         int min_ngas;
         int acid_type, cation_type, base_type, anion_type, reaction_distance_flag;
         double reaction_distance;
-
-
 
         double energy_intra;
 

@@ -55,7 +55,7 @@ using namespace MathConst;
 #define PI 3.1415926
 
 /* ---------------------------------------------------------------------- */
-/* fix ID group-ID charge_regulation nevery nexchanges lb pKa pKb pH pI^+ pI^- reservoir_temperature seed acid_type cation_type base_type anion_type reaction_cutoff*/
+/* fix ID group-ID charge_regulation nevery nmc lb pKa pKb pH pI^+ pI^- reservoir_temperature seed acid_type cation_type base_type anion_type reaction_cutoff*/
 /*If reaction_cutoff is set to zero, it means there is no geometry constraint when inserting and deleting an atom*/
 Fix_charge_regulation::Fix_charge_regulation(LAMMPS *lmp, int narg, char **arg) :
         Fix(lmp, narg, arg),
@@ -87,7 +87,7 @@ Fix_charge_regulation::Fix_charge_regulation(LAMMPS *lmp, int narg, char **arg) 
     options(narg - 5, &arg[5]);
 
     if (nevery <= 0) error->all(FLERR, "Illegal fix charge_regulation command");
-    if (nexchanges < 0) error->all(FLERR, "Illegal fix charge_regulation command");
+    if (nmc < 0) error->all(FLERR, "Illegal fix charge_regulation command");
     if (lb < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
 
     if (*target_temperature_tcp < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
@@ -100,6 +100,14 @@ Fix_charge_regulation::Fix_charge_regulation(LAMMPS *lmp, int narg, char **arg) 
     if ((salt_charge[1] % salt_charge[0] != 0) && (salt_charge[0] % salt_charge[1] != 0))
         error->all(FLERR,
                    "Illegal fix charge_regulation command, multivalent cation/anion charges are allowed, but must be divisible, e.g. (3,-1) is fine, but (3,-2) is not implemented");
+
+    if (pmcmoves[0] < 0 || pmcmoves[1] < 0 || pmcmoves[2] < 0 ) error->all(FLERR, "Illegal fix charge_regulation command");
+    if (acid_type < 0) pmcmoves[0]=0;
+    if (base_type < 0) pmcmoves[1]=0;
+    // normalize
+    double psum = pmcmoves[0] + pmcmoves[1] + pmcmoves[2];
+    if (psum <=0 ) error->all(FLERR, "Illegal fix charge_regulation command");
+    pmcmoves[0] /= psum; pmcmoves[1] /= psum; pmcmoves[2] /= psum;
 
 
     force_reneighbor = 1;
@@ -117,6 +125,10 @@ Fix_charge_regulation::Fix_charge_regulation(LAMMPS *lmp, int narg, char **arg) 
 Fix_charge_regulation::~Fix_charge_regulation(){
 
     memory->destroy(ptype_ID);
+
+    if (regionflag) delete [] idregion;
+    delete random_equal;
+    delete random_unequal;
 
     if (group) {
         int igroupall = group->find("all");
@@ -281,21 +293,21 @@ void Fix_charge_regulation::pre_exchange() {
     if (!only_salt_flag) {
 
         // Do charge regulation
-        for (int i = 0; i < 6 * nexchanges; i++) {
+        for (int i = 0; i <  nmc; i++) {
             double rand_number = random_equal->uniform();
-            if (rand_number < 1.0 / 6) {
+            if (rand_number < pmcmoves[0]/2 ) {
                 forward_acid();
                 nacid_attempts++;
-            } else if (rand_number < 2.0 / 6) {
+            } else if (rand_number < pmcmoves[0]) {
                 backward_acid();
                 nacid_attempts++;
-            } else if (rand_number < 3.0 / 6) {
+            } else if (rand_number < pmcmoves[0] + pmcmoves[1]/2) {
                 forward_base();
                 nbase_attempts++;
-            } else if (rand_number < 4.0 / 6) {
+            } else if (rand_number < pmcmoves[0] + pmcmoves[1]) {
                 backward_base();
                 nbase_attempts++;
-            } else if (rand_number < 5.0 / 6) {
+            } else if (rand_number < pmcmoves[0] + pmcmoves[1] + pmcmoves[2]/2) {
                 forward_ions();
                 nsalt_attempts++;
             } else {
@@ -310,7 +322,7 @@ void Fix_charge_regulation::pre_exchange() {
         } else {
             salt_charge_ratio = -salt_charge[1] / salt_charge[0];
         }
-        for (int i = 0; i < 2 * nexchanges; i++) {
+        for (int i = 0; i < nmc; i++) {
             double rand_number = random_equal->uniform();
             if (rand_number < 0.5) {
                 forward_ions_multival();
@@ -919,6 +931,11 @@ int Fix_charge_regulation::insert_particle(int ptype, double charge, double rd, 
         atom->v[m][2] = random_unequal->gaussian() * sigma;
         atom->q[m] = charge;
         modify->create_attribute(m);
+
+       // printf("sigma =  %f, %f, %f, %f, %f \n %f, %f, %f  \n",force->boltz, *target_temperature_tcp, sigma, atom->mass[ptype], force->mvv2e,atom->v[m][0],atom->v[m][1],atom->v[m][2]);
+
+
+
     }
     atom->nghost = 0;
     comm->borders();
@@ -1181,7 +1198,8 @@ void Fix_charge_regulation::options(int narg, char **arg) {
     pKb=100;
     pKs = 14.0;
     nevery = 100;
-    nexchanges = 100;
+    nmc = 100;
+    pmcmoves[0] = pmcmoves[1] = pmcmoves[2] = 1.0/3.0;
     lb = 0.72;
 
     reservoir_temperature = 1.0;
@@ -1271,10 +1289,16 @@ void Fix_charge_regulation::options(int narg, char **arg) {
             if (iarg + 2 > narg) error->all(FLERR, "Illegal fix charge regulation command");
             nevery = force->numeric(FLERR, arg[iarg + 1]);
             iarg += 2;
-        } else if (strcmp(arg[iarg], "nexchange") == 0) {
+        } else if (strcmp(arg[iarg], "nmc") == 0) {
             if (iarg + 2 > narg) error->all(FLERR, "Illegal fix charge regulation command");
-            nexchanges = force->numeric(FLERR, arg[iarg + 1]);
+            nmc = force->numeric(FLERR, arg[iarg + 1]);
             iarg += 2;
+        } else if (strcmp(arg[iarg], "pmcmoves") == 0) {
+            if (iarg + 4 > narg) error->all(FLERR, "Illegal fix charge regulation command");
+            pmcmoves[0] = force->numeric(FLERR, arg[iarg + 1]);
+            pmcmoves[1] = force->numeric(FLERR, arg[iarg + 2]);
+            pmcmoves[2] = force->numeric(FLERR, arg[iarg + 3]);
+            iarg += 4;
         } else if (strcmp(arg[iarg], "seed") == 0) {
             if (iarg + 2 > narg) error->all(FLERR, "Illegal fix charge regulation command");
             seed = force->numeric(FLERR, arg[iarg + 1]);

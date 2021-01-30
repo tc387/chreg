@@ -7,7 +7,6 @@
    DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
    certain rights in this software.  This software is distributed under
    the GNU General Public License.
-   the GNU General Public License
 
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
@@ -59,22 +58,17 @@ using namespace MathConst;
 /*If reaction_cutoff is set to zero, it means there is no geometry constraint when inserting and deleting an atom*/
 Fix_charge_regulation::Fix_charge_regulation(LAMMPS *lmp, int narg, char **arg) :
         Fix(lmp, narg, arg),
-        idregion(NULL), ngroups(0), groupstrings(NULL), ngrouptypes(0), grouptypestrings(NULL),
-        grouptypebits(NULL), grouptypes(NULL),
+        ngroups(0), groupstrings(NULL),
         random_equal(NULL), random_unequal(NULL),
         idftemp(NULL), ptype_ID(NULL) {
 
     // Region restrictions not yet implemented ..
 
-    dynamic_group_allow = 1;
-    vector_flag = 1;
-    size_vector = 8;
     global_freq = 1;
     extvector = 0;
     restart_global = 1;
     time_depend = 1;
     cr_nmax = 0;
-    regionflag = 0;
     overlap_flag = 0;
     energy_stored = 0;
 
@@ -101,13 +95,16 @@ Fix_charge_regulation::Fix_charge_regulation(LAMMPS *lmp, int narg, char **arg) 
         error->all(FLERR,
                    "Illegal fix charge_regulation command, multivalent cation/anion charges are allowed, but must be divisible, e.g. (3,-1) is fine, but (3,-2) is not implemented");
 
-    if (pmcmoves[0] < 0 || pmcmoves[1] < 0 || pmcmoves[2] < 0 ) error->all(FLERR, "Illegal fix charge_regulation command");
-    if (acid_type < 0) pmcmoves[0]=0;
-    if (base_type < 0) pmcmoves[1]=0;
+    if (pmcmoves[0] < 0 || pmcmoves[1] < 0 || pmcmoves[2] < 0)
+        error->all(FLERR, "Illegal fix charge_regulation command");
+    if (acid_type < 0) pmcmoves[0] = 0;
+    if (base_type < 0) pmcmoves[1] = 0;
     // normalize
     double psum = pmcmoves[0] + pmcmoves[1] + pmcmoves[2];
-    if (psum <=0 ) error->all(FLERR, "Illegal fix charge_regulation command");
-    pmcmoves[0] /= psum; pmcmoves[1] /= psum; pmcmoves[2] /= psum;
+    if (psum <= 0) error->all(FLERR, "Illegal fix charge_regulation command");
+    pmcmoves[0] /= psum;
+    pmcmoves[1] /= psum;
+    pmcmoves[2] /= psum;
 
 
     force_reneighbor = 1;
@@ -122,17 +119,16 @@ Fix_charge_regulation::Fix_charge_regulation(LAMMPS *lmp, int narg, char **arg) 
     nsalt_successes = 0.0;
 }
 
-Fix_charge_regulation::~Fix_charge_regulation(){
+Fix_charge_regulation::~Fix_charge_regulation() {
 
     memory->destroy(ptype_ID);
 
-    if (regionflag) delete [] idregion;
     delete random_equal;
     delete random_unequal;
 
     if (group) {
         int igroupall = group->find("all");
-        neighbor->exclusion_group_group_delete(exclusion_group,igroupall);
+        neighbor->exclusion_group_group_delete(exclusion_group, igroupall);
     }
 }
 
@@ -172,35 +168,35 @@ void Fix_charge_regulation::init() {
     // used for attempted atom deletions
     // skip if already exists from previous init()
 
-    if ( !exclusion_group_bit ) {
-        char **group_arg = new char*[4];
+    if (!exclusion_group_bit) {
+        char **group_arg = new char *[4];
 
         // create unique group name for atoms to be excluded
         int len = strlen(id) + 30;
         group_arg[0] = new char[len];
-        sprintf(group_arg[0],"Fix_CR:exclusion_group:%s",id);
+        sprintf(group_arg[0], "Fix_CR:exclusion_group:%s", id);
         group_arg[1] = (char *) "subtract";
         group_arg[2] = (char *) "all";
         group_arg[3] = (char *) "all";
-        group->assign(4,group_arg);
+        group->assign(4, group_arg);
         exclusion_group = group->find(group_arg[0]);
         if (exclusion_group == -1)
-            error->all(FLERR,"Could not find fix CR exclusion group ID");
+            error->all(FLERR, "Could not find fix CR exclusion group ID");
         exclusion_group_bit = group->bitmask[exclusion_group];
 
         // neighbor list exclusion setup
         // turn off interactions between group all and the exclusion group
 
         int narg = 4;
-        char **arg = new char*[narg];;
+        char **arg = new char *[narg];;
         arg[0] = (char *) "exclude";
         arg[1] = (char *) "group";
         arg[2] = group_arg[0];
         arg[3] = (char *) "all";
-        neighbor->modify_params(narg,arg);
-        delete [] group_arg[0];
-        delete [] group_arg;
-        delete [] arg;
+        neighbor->modify_params(narg, arg);
+        delete[] group_arg[0];
+        delete[] group_arg;
+        delete[] arg;
     }
 
     // check that no deletable atoms are in atom->firstgroup
@@ -215,10 +211,10 @@ void Fix_charge_regulation::init() {
             if ((mask[i] == groupbit) && (mask[i] && firstgroupbit)) flag = 1;
 
         int flagall;
-        MPI_Allreduce(&flag,&flagall,1,MPI_INT,MPI_SUM,world);
+        MPI_Allreduce(&flag, &flagall, 1, MPI_INT, MPI_SUM, world);
 
         if (flagall)
-            error->all(FLERR,"Cannot do Fix charge regulation on atoms in atom_modify first group");
+            error->all(FLERR, "Cannot do Fix charge regulation on atoms in atom_modify first group");
     }
 
     // construct group bitmask for all new atoms
@@ -229,7 +225,7 @@ void Fix_charge_regulation::init() {
     for (int igroup = 0; igroup < ngroups; igroup++) {
         int jgroup = group->find(groupstrings[igroup]);
         if (jgroup == -1)
-            error->all(FLERR,"Could not find specified fix charge regulation group ID");
+            error->all(FLERR, "Could not find specified fix charge regulation group ID");
         groupbitall |= group->bitmask[jgroup];
     }
 }
@@ -251,8 +247,7 @@ void Fix_charge_regulation::pre_exchange() {
         sublo = domain->sublo;
         subhi = domain->subhi;
     }
-    if (regionflag) volume = region_volume;
-    else volume = domain->xprd * domain->yprd * domain->zprd;
+    volume = domain->xprd * domain->yprd * domain->zprd;
     if (triclinic) domain->x2lamda(atom->nlocal);
     domain->pbc();
     comm->exchange();
@@ -293,21 +288,21 @@ void Fix_charge_regulation::pre_exchange() {
     if (!only_salt_flag) {
 
         // Do charge regulation
-        for (int i = 0; i <  nmc; i++) {
+        for (int i = 0; i < nmc; i++) {
             double rand_number = random_equal->uniform();
-            if (rand_number < pmcmoves[0]/2 ) {
+            if (rand_number < pmcmoves[0] / 2) {
                 forward_acid();
                 nacid_attempts++;
             } else if (rand_number < pmcmoves[0]) {
                 backward_acid();
                 nacid_attempts++;
-            } else if (rand_number < pmcmoves[0] + pmcmoves[1]/2) {
+            } else if (rand_number < pmcmoves[0] + pmcmoves[1] / 2) {
                 forward_base();
                 nbase_attempts++;
             } else if (rand_number < pmcmoves[0] + pmcmoves[1]) {
                 backward_base();
                 nbase_attempts++;
-            } else if (rand_number < pmcmoves[0] + pmcmoves[1] + pmcmoves[2]/2) {
+            } else if (rand_number < pmcmoves[0] + pmcmoves[1] + pmcmoves[2] / 2) {
                 forward_ions();
                 nsalt_attempts++;
             } else {
@@ -920,10 +915,6 @@ int Fix_charge_regulation::insert_particle(int ptype, double charge, double rd, 
         atom->avec->create_atom(ptype, coord);
         m = atom->nlocal - 1;
         atom->mask[m] = groupbitall;
-        for (int igroup = 0; igroup < ngrouptypes; igroup++) {
-            if (ngcmc_type == grouptypes[igroup])
-                atom->mask[m] |= grouptypebits[igroup];
-        }
 
         sigma = sqrt(force->boltz * *target_temperature_tcp / atom->mass[ptype] / force->mvv2e);
         atom->v[m][0] = random_unequal->gaussian() * sigma;
@@ -932,7 +923,7 @@ int Fix_charge_regulation::insert_particle(int ptype, double charge, double rd, 
         atom->q[m] = charge;
         modify->create_attribute(m);
 
-       // printf("sigma =  %f, %f, %f, %f, %f \n %f, %f, %f  \n",force->boltz, *target_temperature_tcp, sigma, atom->mass[ptype], force->mvv2e,atom->v[m][0],atom->v[m][1],atom->v[m][2]);
+        // printf("sigma =  %f, %f, %f, %f, %f \n %f, %f, %f  \n",force->boltz, *target_temperature_tcp, sigma, atom->mass[ptype], force->mvv2e,atom->v[m][0],atom->v[m][1],atom->v[m][2]);
 
 
 
@@ -1071,7 +1062,7 @@ int Fix_charge_regulation::particle_number_xrd(int ptype, double charge, double 
     int count = 0;
     if (rd < small) {
         for (int i = 0; i < atom->nlocal; i++) {
-            if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < small &&  atom->mask[i] != exclusion_group_bit)
+            if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < small && atom->mask[i] != exclusion_group_bit)
                 count++;
         }
     } else {
@@ -1085,7 +1076,7 @@ int Fix_charge_regulation::particle_number_xrd(int ptype, double charge, double 
             dz -= static_cast<int>(1.0 * dz / (zhi - zlo) + 0.5) * (zhi - zlo);
             distance_check = dx * dx + dy * dy + dz * dz;
             if ((distance_check < rd * rd) && atom->type[i] == ptype &&
-                fabs(atom->q[i] - charge) < small &&  atom->mask[i] != exclusion_group_bit) {
+                fabs(atom->q[i] - charge) < small && atom->mask[i] != exclusion_group_bit) {
                 count++;
             }
         }
@@ -1099,7 +1090,7 @@ int Fix_charge_regulation::particle_number(int ptype, double charge) {
 
     int count = 0;
     for (int i = 0; i < atom->nlocal; i++) {
-        if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < small &&  atom->mask[i] != exclusion_group_bit)
+        if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < small && atom->mask[i] != exclusion_group_bit)
             count = count + 1;
     }
     int count_sum = count;
@@ -1189,17 +1180,17 @@ void Fix_charge_regulation::options(int narg, char **arg) {
 
     // defaults
 
-    pH=7.0;
-    pI_plus=100;
-    pI_minus=100;
+    pH = 7.0;
+    pI_plus = 100;
+    pI_minus = 100;
     acid_type = -1;
     base_type = -1;
-    pKa=100;
-    pKb=100;
+    pKa = 100;
+    pKb = 100;
     pKs = 14.0;
     nevery = 100;
     nmc = 100;
-    pmcmoves[0] = pmcmoves[1] = pmcmoves[2] = 1.0/3.0;
+    pmcmoves[0] = pmcmoves[1] = pmcmoves[2] = 1.0 / 3.0;
     lb = 0.72;
 
     reservoir_temperature = 1.0;
@@ -1216,11 +1207,6 @@ void Fix_charge_regulation::options(int narg, char **arg) {
     ngroups = 0;
     int ngroupsmax = 0;
     groupstrings = NULL;
-    ngrouptypes = 0;
-    int ngrouptypesmax = 0;
-    grouptypestrings = NULL;
-    grouptypes = NULL;
-    grouptypebits = NULL;
 
     int iarg = 0;
     while (iarg < narg) {
@@ -1329,18 +1315,18 @@ void Fix_charge_regulation::options(int narg, char **arg) {
                 iarg += 2;
             } else { error->all(FLERR, "Illegal fix charge regulation command"); }
 
-        } else if (strcmp(arg[iarg],"group") == 0) {
-            if (iarg+2 > narg) error->all(FLERR,"Illegal fix fix charge regulation command");
+        } else if (strcmp(arg[iarg], "group") == 0) {
+            if (iarg + 2 > narg) error->all(FLERR, "Illegal fix fix charge regulation command");
             if (ngroups >= ngroupsmax) {
-                ngroupsmax = ngroups+1;
+                ngroupsmax = ngroups + 1;
                 groupstrings = (char **)
                         memory->srealloc(groupstrings,
-                                         ngroupsmax*sizeof(char *),
+                                         ngroupsmax * sizeof(char *),
                                          "fix_charge_regulation:groupstrings");
             }
-            int n = strlen(arg[iarg+1]) + 1;
+            int n = strlen(arg[iarg + 1]) + 1;
             groupstrings[ngroups] = new char[n];
-            strcpy(groupstrings[ngroups],arg[iarg+1]);
+            strcpy(groupstrings[ngroups], arg[iarg + 1]);
             ngroups++;
             iarg += 2;
         } else { error->all(FLERR, "Illegal fix charge regulation command"); }

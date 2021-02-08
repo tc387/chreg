@@ -17,21 +17,21 @@
 
 #ifdef FIX_CLASS
 
-FixStyle(charge_regulation,Fix_charge_regulation)
+FixStyle(charge/regulation,FixChargeRegulation)
 
 #else
 
-#ifndef LMP_FIX_charge_regulation_H
-#define LMP_FIX_charge_regulation_H
+#ifndef LMP_FIX_CHARGE_REGULATION_H
+#define LMP_FIX_CHARGE_REGULATION_H
 
 #include "fix.h"
 
 namespace LAMMPS_NS {
 
-  class Fix_charge_regulation : public Fix {
+  class FixChargeRegulation : public Fix {
   public:
-    Fix_charge_regulation(class LAMMPS *, int, char **);
-    ~Fix_charge_regulation();
+    FixChargeRegulation(class LAMMPS *, int, char **);
+    ~FixChargeRegulation();
     int setmask();
     void init();
     void pre_exchange();

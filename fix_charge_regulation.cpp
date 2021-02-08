@@ -15,46 +15,49 @@
    Contributing author: Tine Curk (tcurk5@gmail.com) and Jiaxing Yuan (yuanjiaxing123@hotmail.com)
 ------------------------------------------------------------------------- */
 #include "fix_charge_regulation.h"
-#include <mpi.h>
-#include <cmath>
-#include <cstring>
+
+#include "angle.h"
 #include "atom.h"
 #include "atom_vec.h"
-#include "molecule.h"
-#include "update.h"
-#include "modify.h"
-#include "fix.h"
+#include "bond.h"
 #include "comm.h"
 #include "compute.h"
-#include "group.h"
-#include "domain.h"
-#include "region.h"
-#include "random_park.h"
-#include "force.h"
-#include "pair.h"
-#include "bond.h"
-#include "angle.h"
 #include "dihedral.h"
+#include "domain.h"
+#include "error.h"
+#include "fix.h"
+#include "force.h"
+#include "group.h"
 #include "improper.h"
 #include "kspace.h"
-#include "math_extra.h"
 #include "math_const.h"
+#include "math_extra.h"
+#include "math_special.h"
 #include "memory.h"
-#include "error.h"
+#include "modify.h"
+#include "molecule.h"
 #include "neighbor.h"
+#include "pair.h"
+#include "random_park.h"
+#include "region.h"
+#include "update.h"
+
+#include <cmath>
+#include <cstring>
+#include <mpi.h>
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
 using namespace MathConst;
+using namespace MathSpecial;
 
 // large energy value used to signal overlap
 #define MAXENERGYSIGNAL 1.0e100
 #define MAXENERGYTEST 1.0e50
-#define small 0.0000001
-#define PI 3.1415926
-
+#define SMALL 0.0000001
+#define VOLUME_FACTOR 0.602214 // volume transfer fator from LAMMPS unit to (N_A * mol / liter)
 /* ---------------------------------------------------------------------- */
-Fix_charge_regulation::Fix_charge_regulation(LAMMPS *lmp, int narg, char **arg) :
+FixChargeRegulation::FixChargeRegulation(LAMMPS *lmp, int narg, char **arg) :
         Fix(lmp, narg, arg),
         ngroups(0), groupstrings(NULL),
         random_equal(NULL), random_unequal(NULL),
@@ -79,28 +82,28 @@ Fix_charge_regulation::Fix_charge_regulation(LAMMPS *lmp, int narg, char **arg) 
   // set defaults and read optional arguments
   options(narg - 5, &arg[5]);
 
-  if (nevery <= 0) error->all(FLERR, "Illegal fix charge_regulation command");
-  if (nmc < 0) error->all(FLERR, "Illegal fix charge_regulation command");
-  if (llength_unit_in_nm < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
-  if (*target_temperature_tcp < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
-  if (seed <= 0) error->all(FLERR, "Illegal fix charge_regulation command");
-  if (cation_type <= 0) error->all(FLERR, "Illegal fix charge_regulation command");
-  if (anion_type <= 0) error->all(FLERR, "Illegal fix charge_regulation command");
-  if (reaction_distance < 0.0) error->all(FLERR, "Illegal fix charge_regulation command");
-  if (salt_charge[0] <= 0) error->all(FLERR, "Illegal fix charge_regulation command");
-  if (salt_charge[1] >= 0) error->all(FLERR, "Illegal fix charge_regulation command");
+  if (nevery <= 0) error->all(FLERR, "Illegal fix charge/regulation command");
+  if (nmc < 0) error->all(FLERR, "Illegal fix charge/regulation command");
+  if (llength_unit_in_nm < 0.0) error->all(FLERR, "Illegal fix charge/regulation command");
+  if (*target_temperature_tcp < 0.0) error->all(FLERR, "Illegal fix charge/regulation command");
+  if (seed <= 0) error->all(FLERR, "Illegal fix charge/regulation command");
+  if (cation_type <= 0) error->all(FLERR, "Illegal fix charge/regulation command");
+  if (anion_type <= 0) error->all(FLERR, "Illegal fix charge/regulation command");
+  if (reaction_distance < 0.0) error->all(FLERR, "Illegal fix charge/regulation command");
+  if (salt_charge[0] <= 0) error->all(FLERR, "Illegal fix charge/regulation command");
+  if (salt_charge[1] >= 0) error->all(FLERR, "Illegal fix charge/regulation command");
   if ((salt_charge[1] % salt_charge[0] != 0) && (salt_charge[0] % salt_charge[1] != 0))
     error->all(FLERR,
-               "Illegal fix charge_regulation command, multivalent cation/anion charges are allowed, "
+               "Illegal fix charge/regulation command, multivalent cation/anion charges are allowed, "
                "but must be divisible, e.g. (3,-1) is fine, but (3,-2) is not implemented");
 
   if (pmcmoves[0] < 0 || pmcmoves[1] < 0 || pmcmoves[2] < 0)
-    error->all(FLERR, "Illegal fix charge_regulation command");
+    error->all(FLERR, "Illegal fix charge/regulation command");
   if (acid_type < 0) pmcmoves[0] = 0;
   if (base_type < 0) pmcmoves[1] = 0;
   // normalize
   double psum = pmcmoves[0] + pmcmoves[1] + pmcmoves[2];
-  if (psum <= 0) error->all(FLERR, "Illegal fix charge_regulation command");
+  if (psum <= 0) error->all(FLERR, "Illegal fix charge/regulation command");
   pmcmoves[0] /= psum;
   pmcmoves[1] /= psum;
   pmcmoves[2] /= psum;
@@ -117,7 +120,7 @@ Fix_charge_regulation::Fix_charge_regulation(LAMMPS *lmp, int narg, char **arg) 
   nsalt_successes = 0;
 }
 
-Fix_charge_regulation::~Fix_charge_regulation() {
+FixChargeRegulation::~FixChargeRegulation() {
 
   memory->destroy(ptype_ID);
 
@@ -130,18 +133,16 @@ Fix_charge_regulation::~Fix_charge_regulation() {
   }
 }
 
-int Fix_charge_regulation::setmask() {
+int FixChargeRegulation::setmask() {
   int mask = 0;
   mask |= PRE_EXCHANGE;
   return mask;
 }
 
-void Fix_charge_regulation::init() {
+void FixChargeRegulation::init() {
 
-  triclinic = domain->triclinic;
-
-  char *id_pe = (char *) "thermo_pe";
-  int ipe = modify->find_compute(id_pe);
+  triclinic = domain->triclinic; 
+  int ipe = modify->find_compute("thermo_pe");
   c_pe = modify->compute[ipe];
 
   if (atom->molecule_flag) {
@@ -226,7 +227,7 @@ void Fix_charge_regulation::init() {
   }
 }
 
-void Fix_charge_regulation::pre_exchange() {
+void FixChargeRegulation::pre_exchange() {
 
   if (next_reneighbor != update->ntimestep) return;
   xlo = domain->boxlo[0];
@@ -263,11 +264,11 @@ void Fix_charge_regulation::pre_exchange() {
     reaction_distance = 0;
   }
   // volume in units of (N_A * mol / liter)
-  volume_rx = (xhi - xlo) * (yhi - ylo) * (zhi - zlo) * pow(llength_unit_in_nm, 3) * 0.602214;
-  if (reaction_distance < small) {
+  volume_rx = (xhi - xlo) * (yhi - ylo) * (zhi - zlo) * cube(llength_unit_in_nm) * VOLUME_FACTOR;
+  if (reaction_distance < SMALL) {
     vlocal_xrd = volume_rx;
   } else {
-    vlocal_xrd = 4.0 * PI * pow(reaction_distance, 3) / 3.0 * pow(llength_unit_in_nm, 3) * 0.602214;
+    vlocal_xrd = 4.0 * MY_PI * cube(reaction_distance) / 3.0 * cube(llength_unit_in_nm) * VOLUME_FACTOR;
   }
   beta = 1.0 / (force->boltz * *target_temperature_tcp);
 
@@ -337,7 +338,7 @@ void Fix_charge_regulation::pre_exchange() {
   next_reneighbor = update->ntimestep + nevery;
 }
 
-void Fix_charge_regulation::forward_acid() {
+void FixChargeRegulation::forward_acid() {
 
   double energy_before = energy_stored;
   double factor;
@@ -360,7 +361,7 @@ void Fix_charge_regulation::forward_acid() {
       pos[2] = atom->x[m1][2];
     }
     npart_xrd2 = ncation;
-    if (reaction_distance >= small) {
+    if (reaction_distance >= SMALL) {
       pos_all[0] = pos[0];
       pos_all[1] = pos[1];
       pos_all[2] = pos[2];
@@ -395,7 +396,7 @@ void Fix_charge_regulation::forward_acid() {
   }
 }
 
-void Fix_charge_regulation::backward_acid() {
+void FixChargeRegulation::backward_acid() {
 
   double energy_before = energy_stored;
   double factor;
@@ -418,7 +419,7 @@ void Fix_charge_regulation::backward_acid() {
       pos[1] = atom->x[m1][1];
       pos[2] = atom->x[m1][2];
     }
-    if (reaction_distance >= small) {
+    if (reaction_distance >= SMALL) {
       pos_all[0] = pos[0];
       pos_all[1] = pos[1];
       pos_all[2] = pos[2];
@@ -468,7 +469,7 @@ void Fix_charge_regulation::backward_acid() {
   }
 }
 
-void Fix_charge_regulation::forward_base() {
+void FixChargeRegulation::forward_base() {
 
   double energy_before = energy_stored;
   double factor;
@@ -491,7 +492,7 @@ void Fix_charge_regulation::forward_base() {
       pos[2] = atom->x[m1][2];
     }
     npart_xrd2 = nanion;
-    if (reaction_distance >= small) {
+    if (reaction_distance >= SMALL) {
       pos_all[0] = pos[0];
       pos_all[1] = pos[1];
       pos_all[2] = pos[2];
@@ -526,7 +527,7 @@ void Fix_charge_regulation::forward_base() {
   }
 }
 
-void Fix_charge_regulation::backward_base() {
+void FixChargeRegulation::backward_base() {
 
   double energy_before = energy_stored;
   double factor;
@@ -549,7 +550,7 @@ void Fix_charge_regulation::backward_base() {
       pos[1] = atom->x[m1][1];
       pos[2] = atom->x[m1][2];
     }
-    if (reaction_distance >= small) {
+    if (reaction_distance >= SMALL) {
       pos_all[0] = pos[0];
       pos_all[1] = pos[1];
       pos_all[2] = pos[2];
@@ -598,7 +599,7 @@ void Fix_charge_regulation::backward_base() {
   }
 }
 
-void Fix_charge_regulation::forward_ions() {
+void FixChargeRegulation::forward_ions() {
 
   double energy_before = energy_stored;
   double factor;
@@ -632,7 +633,7 @@ void Fix_charge_regulation::forward_ions() {
 }
 
 
-void Fix_charge_regulation::backward_ions() {
+void FixChargeRegulation::backward_ions() {
 
   double energy_before = energy_stored;
   double factor;
@@ -717,7 +718,7 @@ void Fix_charge_regulation::backward_ions() {
   }
 }
 
-void Fix_charge_regulation::forward_ions_multival() {
+void FixChargeRegulation::forward_ions_multival() {
 
   double energy_before = energy_stored;
   double factor = 1;
@@ -771,7 +772,7 @@ void Fix_charge_regulation::forward_ions_multival() {
   }
 }
 
-void Fix_charge_regulation::backward_ions_multival() {
+void FixChargeRegulation::backward_ions_multival() {
 
   double energy_before = energy_stored;
   double factor = 1;
@@ -840,7 +841,7 @@ void Fix_charge_regulation::backward_ions_multival() {
     atom->natoms -= 1 + salt_charge_ratio;
     // ions must be deleted in order, otherwise index m could change upon the first deletion
     for (int i = 0; i < salt_charge_ratio + 1; i++) {
-      // get max mm value, poor N^2 scaling, but charge ratio is a small number (2 or 3).
+      // get max mm value, poor N^2 scaling, but charge ratio is a SMALL number (2 or 3).
       int maxmm = -1, jmaxm = -1;
       for (int j = 0; j < salt_charge_ratio + 1; j++) {
         if (mm[j] > maxmm) {
@@ -883,20 +884,20 @@ void Fix_charge_regulation::backward_ions_multival() {
   }
 }
 
-int Fix_charge_regulation::insert_particle(int ptype, double charge, double rd, double *target) {
+int FixChargeRegulation::insert_particle(int ptype, double charge, double rd, double *target) {
 
   // insert a particle of type (ptype) with charge (charge) within distance (rd) of (target)
 
   double coord[3];
   int m = -1;
-  if (rd < small) {
+  if (rd < SMALL) {
     coord[0] = xlo + random_equal->uniform() * (xhi - xlo);
     coord[1] = ylo + random_equal->uniform() * (yhi - ylo);
     coord[2] = zlo + random_equal->uniform() * (zhi - zlo);
   } else {
     double radius = reaction_distance * random_equal->uniform();
-    double theta = random_equal->uniform() * PI;
-    double phi = random_equal->uniform() * 2 * PI;
+    double theta = random_equal->uniform() * MY_PI;
+    double phi = random_equal->uniform() * 2 * MY_PI;
     coord[0] = target[0] + radius * sin(theta) * cos(phi);
     coord[1] = target[1] + radius * sin(theta) * sin(phi);
     coord[2] = target[2] + radius * cos(theta);
@@ -926,7 +927,7 @@ int Fix_charge_regulation::insert_particle(int ptype, double charge, double rd, 
   return m;
 }
 
-int Fix_charge_regulation::get_random_particle(int ptype, double charge, double rd, double *target) {
+int FixChargeRegulation::get_random_particle(int ptype, double charge, double rd, double *target) {
 
   // returns a randomly chosen particle of type (ptype) with charge (charge)
   // chosen among particles within distance (rd) of (target)
@@ -947,9 +948,9 @@ int Fix_charge_regulation::get_random_particle(int ptype, double charge, double 
   count_global = 0;
   count_before = 0;
 
-  if (rd < small) {  //reaction_distance < small: No geometry constraint on random particle choice
+  if (rd < SMALL) {  //reaction_distance < SMALL: No geometry constraint on random particle choice
     for (int i = 0; i < nlocal; i++) {
-      if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < small &&
+      if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < SMALL &&
           atom->mask[i] != exclusion_group_bit) {
         ptype_ID[count_local] = i;
         count_local++;
@@ -966,7 +967,7 @@ int Fix_charge_regulation::get_random_particle(int ptype, double charge, double 
       dz -= static_cast<int>(1.0 * dz / (zhi - zlo) + 0.5) * (zhi - zlo);
       distance_check = dx * dx + dy * dy + dz * dz;
       if ((distance_check < rd * rd) && atom->type[i] == ptype &&
-          fabs(atom->q[i] - charge) < small && atom->mask[i] != exclusion_group_bit) {
+          fabs(atom->q[i] - charge) < SMALL && atom->mask[i] != exclusion_group_bit) {
         ptype_ID[count_local] = i;
         count_local++;
       }
@@ -990,7 +991,7 @@ int Fix_charge_regulation::get_random_particle(int ptype, double charge, double 
   return -1;
 }
 
-double Fix_charge_regulation::energy_full() {
+double FixChargeRegulation::energy_full() {
   int imolecule;
   if (triclinic) domain->x2lamda(atom->nlocal);
   domain->pbc();
@@ -1050,12 +1051,12 @@ double Fix_charge_regulation::energy_full() {
   return total_energy;
 }
 
-int Fix_charge_regulation::particle_number_xrd(int ptype, double charge, double rd, double *target) {
+int FixChargeRegulation::particle_number_xrd(int ptype, double charge, double rd, double *target) {
 
   int count = 0;
-  if (rd < small) {
+  if (rd < SMALL) {
     for (int i = 0; i < atom->nlocal; i++) {
-      if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < small && atom->mask[i] != exclusion_group_bit)
+      if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < SMALL && atom->mask[i] != exclusion_group_bit)
         count++;
     }
   } else {
@@ -1069,7 +1070,7 @@ int Fix_charge_regulation::particle_number_xrd(int ptype, double charge, double 
       dz -= static_cast<int>(1.0 * dz / (zhi - zlo) + 0.5) * (zhi - zlo);
       distance_check = dx * dx + dy * dy + dz * dz;
       if ((distance_check < rd * rd) && atom->type[i] == ptype &&
-          fabs(atom->q[i] - charge) < small && atom->mask[i] != exclusion_group_bit) {
+          fabs(atom->q[i] - charge) < SMALL && atom->mask[i] != exclusion_group_bit) {
         count++;
       }
     }
@@ -1079,11 +1080,11 @@ int Fix_charge_regulation::particle_number_xrd(int ptype, double charge, double 
   return count_sum;
 }
 
-int Fix_charge_regulation::particle_number(int ptype, double charge) {
+int FixChargeRegulation::particle_number(int ptype, double charge) {
 
   int count = 0;
   for (int i = 0; i < atom->nlocal; i++) {
-    if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < small && atom->mask[i] != exclusion_group_bit)
+    if (atom->type[i] == ptype && fabs(atom->q[i] - charge) < SMALL && atom->mask[i] != exclusion_group_bit)
       count = count + 1;
   }
   int count_sum = count;
@@ -1091,7 +1092,7 @@ int Fix_charge_regulation::particle_number(int ptype, double charge) {
   return count_sum;
 }
 
-double Fix_charge_regulation::compute_vector(int n) {
+double FixChargeRegulation::compute_vector(int n) {
   double count_temp = 0;
   if (n == 0) {
     return nacid_attempts + nbase_attempts + nsalt_attempts;
@@ -1113,7 +1114,7 @@ double Fix_charge_regulation::compute_vector(int n) {
   return 0.0;
 }
 
-void Fix_charge_regulation::setThermoTemperaturePointer() {
+void FixChargeRegulation::setThermoTemperaturePointer() {
   int ifix = -1;
   ifix = modify->find_fix(idftemp);
   if (ifix == -1) {
@@ -1126,7 +1127,7 @@ void Fix_charge_regulation::setThermoTemperaturePointer() {
 
 }
 
-void Fix_charge_regulation::assign_tags() {
+void FixChargeRegulation::assign_tags() {
   // Assign tags to ions with zero tags
   if (atom->tag_enable) {
     tagint *tag = atom->tag;
@@ -1167,7 +1168,7 @@ void Fix_charge_regulation::assign_tags() {
    parse input options
 ------------------------------------------------------------------------- */
 
-void Fix_charge_regulation::options(int narg, char **arg) {
+void FixChargeRegulation::options(int narg, char **arg) {
   if (narg < 0) error->all(FLERR, "Illegal fix charge regulation command");
 
   // defaults
@@ -1182,12 +1183,12 @@ void Fix_charge_regulation::options(int narg, char **arg) {
   pKs = 14.0;
   nevery = 100;
   nmc = 100;
-  pmcmoves[0] = pmcmoves[1] = pmcmoves[2] = 0.33;
+  pmcmoves[0] = pmcmoves[1] = pmcmoves[2] = THIRD;
   llength_unit_in_nm= 0.72;
 
   reservoir_temperature = 1.0;
   reaction_distance = 0;
-  seed = 12345;
+  seed = 0;
   target_temperature_tcp = &reservoir_temperature;
   add_tags_flag = false;
   only_salt_flag = false;
@@ -1297,9 +1298,9 @@ void Fix_charge_regulation::options(int narg, char **arg) {
         if (iarg + 4 > narg) error->all(FLERR, "Illegal fix charge regulation command");
         salt_charge[0] = utils::numeric(FLERR, arg[iarg + 2], false, lmp);
         salt_charge[1] = utils::numeric(FLERR, arg[iarg + 3], false, lmp);
-        if (fabs(salt_charge[0] - utils::inumeric(FLERR, arg[iarg + 2], false, lmp)) > small)
+        if (fabs(salt_charge[0] - utils::inumeric(FLERR, arg[iarg + 2], false, lmp)) > SMALL)
           error->all(FLERR, "Illegal fix charge regulation command, cation charge must be an integer");
-        if (fabs(salt_charge[1] - utils::inumeric(FLERR, arg[iarg + 3], false, lmp)) > small)
+        if (fabs(salt_charge[1] - utils::inumeric(FLERR, arg[iarg + 3], false, lmp)) > SMALL)
           error->all(FLERR, "Illegal fix charge regulation command, anion charge must be an integer");
         iarg += 4;
       } else if (strcmp(arg[iarg + 1], "no") == 0) {
@@ -1329,7 +1330,7 @@ void Fix_charge_regulation::options(int narg, char **arg) {
    memory usage of local atom-based arrays
 ------------------------------------------------------------------------- */
 
-double Fix_charge_regulation::memory_usage() {
+double FixChargeRegulation::memory_usage() {
   double bytes = cr_nmax * sizeof(int);
   return bytes;
 }

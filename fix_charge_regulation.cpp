@@ -190,39 +190,6 @@ void FixChargeRegulation::init() {
     arg[3] = (char *) "all";
     neighbor->modify_params(narg,arg);
     delete [] arg;
-
-
-    /*
-    char **group_arg = new char *[4];
-
-    // create unique group name for atoms to be excluded
-    int len = strlen(id) + 30;
-    group_arg[0] = new char[len];
-    sprintf(group_arg[0], "Fix_CR:exclusion_group:%s", id);
-    group_arg[1] = (char *) "subtract";
-    group_arg[2] = (char *) "all";
-    group_arg[3] = (char *) "all";
-    group->assign(4, group_arg);
-    exclusion_group = group->find(group_arg[0]);
-    if (exclusion_group == -1)
-      error->all(FLERR, "Could not find fix CR exclusion group ID");
-    exclusion_group_bit = group->bitmask[exclusion_group];
-
-    // neighbor list exclusion setup
-    // turn off interactions between group all and the exclusion group
-
-    int narg = 4;
-    char **arg = new char *[narg];;
-    arg[0] = (char *) "exclude";
-    arg[1] = (char *) "group";
-    arg[2] = group_arg[0];
-    arg[3] = (char *) "all";
-    neighbor->modify_params(narg, arg);
-    delete[] group_arg[0];
-    delete[] group_arg;
-    delete[] arg;
-
-     */
   }
 
   // check that no deletable atoms are in atom->firstgroup

@@ -10,7 +10,6 @@
 
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
-------------------------------------------------------------------------- */
 
 /* ----------------------------------------------------------------------
    Contributing author: Tine Curk (tcurk5@gmail.com) and Jiaxing Yuan (yuanjiaxing123@hotmail.com)
@@ -602,7 +601,7 @@ void FixChargeRegulation::backward_base() {
         atom->mask[m2] = exclusion_group_bit;
       }
       factor = (1 + nbase_neutral) * vlocal_xrd * c10pKb * c10pI_minus /
-              (c10pOh * nbase_charged * npart_xrd);
+              (c10pOH * nbase_charged * npart_xrd);
 
       double energy_after = energy_full();
 

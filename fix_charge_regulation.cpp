@@ -89,7 +89,7 @@ FixChargeRegulation::FixChargeRegulation(LAMMPS *lmp, int narg, char **arg) :
   if (nmc < 0) error->all(FLERR, "Illegal fix charge/regulation command");
   if (llength_unit_in_nm < 0.0) error->all(FLERR, "Illegal fix charge/regulation command");
   if (*target_temperature_tcp < 0.0) error->all(FLERR, "Illegal fix charge/regulation command");
-  if (seed <= 0) error->all(FLERR, "Illegal fix charge/regulation command");
+  if (seed <= 0) error->all(FLERR, "Illegal fix charge/regulation command: Seed value (positive integer) must be provided ");
   if (cation_type <= 0) error->all(FLERR, "Illegal fix charge/regulation command");
   if (anion_type <= 0) error->all(FLERR, "Illegal fix charge/regulation command");
   if (reaction_distance < 0.0) error->all(FLERR, "Illegal fix charge/regulation command");

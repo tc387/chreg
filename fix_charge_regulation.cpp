@@ -897,7 +897,7 @@ int FixChargeRegulation::insert_particle(int ptype, double charge, double rd, do
     coord[1] = ylo + random_equal->uniform() * (yhi - ylo);
     coord[2] = zlo + random_equal->uniform() * (zhi - zlo);
   } else {
-    double radius = reaction_distance * pow (random_equal->uniform(), THIRD);
+    double radius = reaction_distance * pow(random_equal->uniform(), THIRD);
     double theta = random_equal->uniform() * MY_PI;
     double phi = random_equal->uniform() * 2 * MY_PI;
     coord[0] = target[0] + radius * sin(theta) * cos(phi);
